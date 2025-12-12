@@ -1,0 +1,72 @@
+
+
+    /* IDEA 
+        given this dataset if images:
+        read each image and say this is a one this is a seven etc.
+        to get some train data to feed the neural network
+
+        neural network of n neurons 
+        cost function 
+        train function
+        -> learn function
+        log function
+    */
+    
+    /* APPROACH
+        this neural network has two layers
+        input layer has 784 nodes which is pixels of each image 
+        has no parameters
+        first layer has 10 nodes (hidden layer) 
+        second layer 10 nodes (output layer)
+        (both layers are a linear combination of the input layer)
+    */
+
+
+    /* FORWARD PROPAGATION
+        compute what the output will be for the input
+        
+        1. input layer A0 = x (784 x m) 
+        
+        2. Z1 = W1 x A0 + b1  (linear algebra, weight and bias)
+          10xm, 10x784, 784xm,10x1 => 10xm
+    
+        3. Activation Function: (necessary otherwise we would just have a fancy linear combination)
+        tan / sigmoid which makes it non linear which is necessary to describe this complicated stuff mathmatically
+        RELU - rectified linear unit = x if x > 0 and 0 of x <=0
+
+        => A1 = g(Z1) = ReLU(Z1)
+
+        4. Z2 = W2 x A1 + b2 (second layer)
+
+        A2 = softmax(Z2) - output layer -> softwamax() -> probablilities
+        softmax := e^zi / sum e^zj (maps values between 0-1)
+    */
+
+    /* BACKWARDS PROPAGATION
+        -> given random weights and biases for the model and some training data,
+        run this through the model, see the output vs the expected output and 
+        change it around until it works
+
+        -> approximate it using math cost function, learn function etc.
+        the training data can just be 1 for 3 and 0 for all else if the picture
+        shows a three
+
+        -> use derivatives of weight and bias functions to learn
+        then update the weights and biases accordingly
+    */
+
+
+reading the data from the IDX File:
+
+Stores images in binary as 1D bin strings:
+    Header (first few bytes):
+        Magic number: identifies type and dimensions
+        Number of images
+        Image height
+        Image width
+    Data (rest of the file):
+        Every pixel is a byte (0–255)
+        Images are “flattened” into 1D arrays
+        Stored sequentially, so first 28×28 bytes = first image, next 28×28 bytes = second image, etc.
+        
+
