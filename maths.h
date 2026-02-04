@@ -1,0 +1,45 @@
+
+#ifndef MATHS_H
+#define MATHS_H
+
+#include <math.h>
+#include <stdlib.h>
+
+float relu(float x)
+{
+    if (x > 0)
+        return x;
+    return 0;
+}
+
+void softmax(const float z[10], float o[10])
+{
+    float max_z = z[0];
+    for (int i = 1; i < 10; ++i)
+        if (z[i] > max_z) max_z = z[i];
+
+    float sum = 0.0f;
+    for (int i = 0; i < 10; ++i)
+    {
+        o[i] = expf(z[i] - max_z);
+        sum += o[i];
+    }
+
+    for (int i = 0; i < 10; ++i)
+        o[i] /= sum;
+}
+
+float dot_product(const float* a, const float* b, int n) 
+{
+    float sum = 0.0f;
+    for (int i = 0; i < n; i++) 
+        sum += a[i] * b[i];
+    return sum;
+}
+
+float randf()
+{
+    return (0.5 - (float)rand() / (float)RAND_MAX);
+}
+
+#endif

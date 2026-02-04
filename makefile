@@ -1,6 +1,6 @@
 
 make:
-	gcc main.c -o main
+	gcc main.c -lm -o main
 
 clean: 
 	rm main
