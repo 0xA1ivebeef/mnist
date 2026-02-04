@@ -16,6 +16,7 @@ const char* ascii_char = ".:-=+*#%@";
 uint8_t* get_image(IDX_Data* images, const int image_count, const int index);
 uint8_t* get_label(IDX_Data* labels, const int image_count, const int index);
 void dump_pgm(uint8_t* data, int px_count);
+void perf_test(IDX_Data* images, IDX_Data* labels);
 void log_state(float w1[10][784], float w2[10][10], float b1[10], float b2[10]);
 void log_neurons(float n[10]);
 void save_pgm(char* filename, uint8_t* pixels);
@@ -58,6 +59,21 @@ void dump_pgm(uint8_t* data, int px_count)
     }
 }
 
+void perf_test(IDX_Data* images, IDX_Data* labels)
+{
+    uint8_t* label123 = ((uint8_t*)labels->data) + 123;
+    printf("label 123: %d\n", *label123);
+
+    for (int i = 10; i < 20; ++i)
+    {
+        uint8_t* img = get_image(images, images->total_bytes / dim, i);
+        dump_pgm(img, dim);
+
+        uint8_t l = *get_label(labels, images->total_bytes / dim, i);
+        printf("index %d, label: %d\n", i, l);
+    }
+}
+
 void log_state(float w1[10][784], float w2[10][10], float b1[10], float b2[10])
 {
     // w1
@@ -93,6 +109,31 @@ void log_neurons(float n[10])
     printf("logging neuron state: \n");
     for (int i = 0; i < 10; ++i)
         printf("%d: %f\n", i+1, n[i]);
+    printf("\n\n");
+}
+
+void log_prop(float w1[][784], float w2[][10], float b1[], float b2[], float z1[], 
+        float h[], float z2[], float o[], float one_hot[])
+{
+    printf("\n\nlogging state of propagation\n\n");
+
+    // log_state(w1, w2, b1, b2);
+
+    printf("z1\n");
+    log_neurons(z1);
+
+    printf("z2\n");
+    log_neurons(z2);
+
+    printf("h\n");
+    log_neurons(h);
+
+    printf("fp out\n");
+    log_neurons(o);
+
+    printf("one hot\n");
+    log_neurons(one_hot);
+
     printf("\n\n");
 }
 

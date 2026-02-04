@@ -18,14 +18,14 @@ void seed_w1(float w1[10][784])
 {
     for (int i = 0; i < 10; ++i)
         for (int j = 0; j < 784; ++j)
-            w1[i][j] = randf();
+            w1[i][j] = (randf() - 0.5f) * 0.1f;
 }
 
 void seed_w2(float w2[10][10])
 {
     for (int i = 0; i < 10; ++i)
         for (int j = 0; j < 10; ++j)
-            w2[i][j] = randf();
+            w2[i][j] = (randf() - 0.5f) * 0.1f;
 }
 
 void seed_biases(float b[10])
@@ -46,8 +46,6 @@ void forward_propagation(float w1[10][784], float w2[10][10], float b1[10],
             z1[j] += w1[j][i] * X[i];
         z1[j] += b1[j];
     }
-    printf("forward_prop l1: \n");
-    log_neurons(z1);
 
     for (int i = 0; i < 10; ++i)
         h[i] = relu(z1[i]);
@@ -63,28 +61,39 @@ void forward_propagation(float w1[10][784], float w2[10][10], float b1[10],
     softmax(z2, o);
 }
 
-void backward_propagation(float w1[10][784], float w2[10][10], float b1[10], float b2[10], float buff[10], float one_hot[10])
+void backward_propagation(float w1[10][784], float w2[10][10], float b1[10], 
+        float b2[10], float X[784], float z1[10], float h[10], float z2[10], 
+        float o[10], float one_hot[10], float lr)
 {
-    float delta[10] = {0};
+    float delta_out[10] = {0};
+    float delta_hidden[10] = {0};
+
     for (int i = 0; i < 10; ++i)
-        delta[i] = buff[i] - one_hot[i];
+        delta_out[i] = o[i] - one_hot[i];
 
-    
-
-}
-
-void perf_test(IDX_Data* images, IDX_Data* labels)
-{
-    uint8_t* label123 = ((uint8_t*)labels->data) + 123;
-    printf("label 123: %d\n", *label123);
-
-    for (int i = 10; i < 20; ++i)
+    // w2 and b2
+    for (int i = 0; i < 10; ++i)
     {
-        uint8_t* img = get_image(images, images->total_bytes / dim, i);
-        dump_pgm(img, dim);
+        for (int j = 0; j < 10; ++j)
+            w2[i][j] -= lr * delta_out[i] * h[j]; 
+        b2[i] -= lr * delta_out[i];
+    }
 
-        uint8_t l = *get_label(labels, images->total_bytes / dim, i);
-        printf("index %d, label: %d\n", i, l);
+    // hidden delta
+    for (int i = 0; i < 10; ++i)
+    {
+        float sum = 0.0f;
+        for (int j = 0; j < 10; ++j)
+            sum += w2[j][i] * delta_out[j];
+        delta_hidden[i] = relu_derivative(z1[i]) * sum;
+    }
+
+    // w1 and b1
+    for (int i = 0; i < 10; ++i)
+    {
+        for (int j = 0; j < 784; ++j)
+            w1[i][j] -= lr * delta_hidden[i] * X[j]; 
+        b1[i] -= lr * delta_hidden[i];
     }
 }
 
@@ -113,7 +122,7 @@ int main(void)
     seed_biases(b2);
 
     // log_state(w1, w2, b1, b2);
-    
+
     // work with a single image for now
     uint8_t* this_image = ((uint8_t*)images->data) + 123 * 28 * 28; // take image 123 as example beeing a 6
     uint8_t* this_label = ((uint8_t*)labels->data) + 123; 
@@ -132,21 +141,14 @@ int main(void)
     float  o[10] = {0};
 
     forward_propagation(w1, w2, b1, b2, float_image, z1, h, z2, o);
+    printf("LOGGING FORWARD PROP\n");
+    log_prop(w1, w2, b1, b2, z1, h, z2, o, one_hot);
 
-    printf("logging state after forward prop\n");
-    printf("z1\n");
-    log_neurons(z1);
-    printf("z2\n");
-    log_neurons(z2);
-    printf("hidden\n");
-    log_neurons(h);
-    printf("fp out\n");
-    log_neurons(o);
-    printf("one hot\n");
-    log_neurons(one_hot);
+    const float lr = 1e-2;
+    backward_propagation(w1, w2, b1, b2, float_image, z1, h, z2, o, one_hot, lr);
+    printf("LOGGING BACKWARD PROP\n");
+    log_prop(w1, w2, b1, b2, z1, h, z2, o, one_hot);
 
-    backward_propagation(w1, w2, b1, b2, o, one_hot);
-    
     idx_free(images);
     idx_free(labels);
 

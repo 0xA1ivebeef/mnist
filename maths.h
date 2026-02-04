@@ -7,9 +7,16 @@
 
 float relu(float x)
 {
-    if (x > 0)
+    if (x > 0.0f)
         return x;
-    return 0;
+    return 0.0f;
+}
+
+float relu_derivative(float x)
+{
+    if (x > 0.0f)
+        return 1.0f;
+    return 0.0f;
 }
 
 void softmax(const float z[10], float o[10])
@@ -39,7 +46,7 @@ float dot_product(const float* a, const float* b, int n)
 
 float randf()
 {
-    return (0.5 - (float)rand() / (float)RAND_MAX);
+    return (float)rand() / RAND_MAX;
 }
 
 #endif
