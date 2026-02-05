@@ -3,6 +3,7 @@
 #define MODEL_H
 
 #define HIDDEN 128
+#define BATCH_SIZE 32
 
 typedef struct Model
 {
@@ -15,5 +16,13 @@ typedef struct Model
     float   z2[10]; 
     float   o[10];
 } Model;
+
+typedef struct BatchModel 
+{
+    float z1_batch[BATCH_SIZE * HIDDEN];
+    float h_batch[BATCH_SIZE * HIDDEN];
+    float z2_batch[BATCH_SIZE * 10];
+    float o_batch[BATCH_SIZE * 10];
+} BatchModel;
 
 #endif

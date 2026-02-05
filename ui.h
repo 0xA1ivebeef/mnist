@@ -12,7 +12,7 @@ void cleanup(SDL_Window* w, SDL_Renderer* r);
 int init_sdl(SDL_Window** w, SDL_Renderer** r)
 {
     SDL_Init(SDL_INIT_VIDEO);
-    *w = SDL_CreateWindow("SDL Window", 0, 0, 0, 0, SDL_WINDOW_FULLSCREEN);
+    *w = SDL_CreateWindow("SDL Window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1080, 1080, SDL_WINDOW_SHOWN);
     if (!*w)
     { 
         SDL_Quit();
@@ -30,7 +30,7 @@ int init_sdl(SDL_Window** w, SDL_Renderer** r)
     return 0;
 }
 
-void cleanup(SDL_Window* w, SDL_Renderer* r)
+void cleanup_sdl(SDL_Window* w, SDL_Renderer* r)
 {
     SDL_DestroyWindow(w);
     SDL_DestroyRenderer(r);
