@@ -3,7 +3,11 @@
 #define LOGGER_H
 
 #include <stdio.h>
+#include <string.h>
+#include <stdint.h>
 #include <math.h>
+
+const char* ascii_char = ".:-=+*#%@";
 
 void log_state(float w1[10][784], float w2[10][10], float b1[10], float b2[10])
 {
@@ -83,6 +87,49 @@ void log_loss(float* one_hot, float* o)
         loss -= one_hot[i]  * logf(o[i] + 1e-8f); // avoid log(0)
     
     printf("log_loss current loss: %f\n", loss);
+}
+
+void dump_float_image(const float* data, const int px_count)
+{
+    if (!data || px_count < 1)
+    {
+        fprintf(stderr, "ERROR, dump_float_image invalid input \n");
+        return;
+    }
+    
+    const int ascii_char_l = strlen(ascii_char);
+    for (int i = 0; i < px_count; ++i)
+    {
+        float px = data[i];
+
+        int idx = (px * ascii_char_l);
+        printf("%c", ascii_char[idx]);
+                
+        if ((i + 1) % (int)sqrt(px_count) == 0)
+            printf("\n");
+    }
+    
+}
+
+void dump_pgm(const uint8_t* data, const int px_count)
+{
+    if (!data || px_count < 1)
+    {
+        fprintf(stderr, "ERROR, dump_pgm invalid input\n");
+        return;
+    }
+    
+    const int ascii_char_l = strlen(ascii_char);
+    for (int i = 0; i < px_count; ++i)
+    {
+        uint8_t px = data[i];
+
+        int idx = (px * ascii_char_l) / 255;
+        printf("%c", ascii_char[idx]);
+                
+        if ((i + 1) % (int)sqrt(px_count) == 0)
+            printf("\n");
+    }
 }
 
 #endif

@@ -3,31 +3,20 @@
 #include <string.h>
 #include <time.h>
 #include <assert.h>
-
 #include <cblas.h>
 
 #include "idx.h"
 #include "util.h"
 #include "maths.h"
 #include "logger.h"
+#include "model.h"
+#include "serialize.h"
 
 #define UI_IMPLEMENTATION
 #include "ui.h"
 
 #define TRAIN_FILE "t60k"
 #define TRAIN_LABELS "tl60k"
-
-typedef struct Model
-{
-    float   w1[HIDDEN][784];
-    float   b1[HIDDEN]; 
-    float   w2[10][HIDDEN]; 
-    float   b2[10]; 
-    float   z1[HIDDEN]; 
-    float   h[HIDDEN]; 
-    float   z2[10]; 
-    float   o[10];
-} Model;
 
 void forwardprop(Model* model, float* X) 
 {
@@ -114,36 +103,6 @@ void check_accuracy(Model* model, float* images, const int image_count, const in
         printf("Accuracy %.2f%%\n", accuracy * 100);
 }
 
-void seed_model(Model* model)
-{
-    seed_w1(model->w1);
-    seed_w2(model->w2);
-    seed_biases(model-> b1, HIDDEN);
-    seed_biases(model-> b2, 10);
-}
-
-int load_model(const char* model_path, Model* model)
-{
-    // TODO implement
-    
-    return 0;
-}
-
-int save_model(Model* model)
-{
-    FILE* out = fopen("out.dat", "wb");
-    if (!out)
-    {
-        fprintf(stderr, "save_model: file creation failed\n");
-        return -1;
-    }
-    
-    // TODO serialize 
-
-    fclose(out);
-    return 0;
-}
-
 int main(void)
 {
     // TODO implement batching
@@ -185,11 +144,10 @@ int main(void)
             // log_loss(one_hot, o);
         }
     }
+
     check_accuracy(&model, images, image_count, labels);
     
-    // TODO 
-    // load_model(model_path, &model);
-    save_model(&model);
+    save_model(NULL, &model);
 
     free(images);
     free(labels);
