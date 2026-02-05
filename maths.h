@@ -5,14 +5,14 @@
 #include <math.h>
 #include <stdlib.h>
 
-float relu(float x)
+static inline float relu(float x)
 {
     if (x > 0.0f)
         return x;
     return 0.0f;
 }
 
-float relu_derivative(float x)
+static inline float relu_derivative(float x)
 {
     if (x > 0.0f)
         return 1.0f;
@@ -36,7 +36,7 @@ void softmax(const float z[10], float o[10])
         o[i] /= sum;
 }
 
-float dot_product(const float* a, const float* b, int n) 
+static inline float dot_product(const float* a, const float* b, int n) 
 {
     float sum = 0.0f;
     for (int i = 0; i < n; i++) 
@@ -44,7 +44,7 @@ float dot_product(const float* a, const float* b, int n)
     return sum;
 }
 
-float randf()
+static inline float randf()
 {
     return (float)rand() / RAND_MAX;
 }

@@ -59,7 +59,7 @@ IDX_Data* idx_load(const char* filename)
         return NULL;
     }
 
-    IDX_Data* idx = calloc(1, sizeof(IDX_Data));
+    IDX_Data* idx  = calloc(1, sizeof(IDX_Data));
     idx->data_type = header[2];   // byte 2
     idx->num_dims  = header[3];   // byte 3
 
@@ -108,3 +108,4 @@ void idx_free(IDX_Data* idx)
 }
 
 #endif
+
