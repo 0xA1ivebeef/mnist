@@ -9,10 +9,14 @@ void cleanup(SDL_Window* w, SDL_Renderer* r);
 
 #ifdef UI_IMPLEMENTATION
 
+#define WINDOW_WIDTH 840
+#define WINDOW_HEIGHT 840
+#define WINDOW_SIZE WINDOW_HEIGHT * WINDOW_WIDTH
+
 int init_sdl(SDL_Window** w, SDL_Renderer** r)
 {
     SDL_Init(SDL_INIT_VIDEO);
-    *w = SDL_CreateWindow("SDL Window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1080, 1080, SDL_WINDOW_SHOWN);
+    *w = SDL_CreateWindow("SDL Window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
     if (!*w)
     { 
         SDL_Quit();
