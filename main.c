@@ -1,121 +1,272 @@
 
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+#include <assert.h>
+#include <cblas.h>
+
+#include "idx.h"
+#include "util.h"
+#include "maths.h"
+#include "logger.h"
+#include "model.h"
+#include "serialize.h"
+
 #define UI_IMPLEMENTATION
 #include "ui.h"
 
-#include <stdio.h>
+#define TRAIN_FILE "t60k"
+#define TRAIN_LABELS "tl60k"
 
-typedef struct Button
+void batch_forwardprop(Model* model, BatchModel* bm, float* x_batch, const int curr_batch_size) 
 {
-    int x, y;
-    int w, h;
-} Button;
+    // Input -> hidden
+    cblas_sgemm(
+        CblasRowMajor, CblasNoTrans, CblasTrans,
+        curr_batch_size,   // <-- use curr_batch_size
+        HIDDEN, 784, 1.0f,
+        x_batch, 784,
+        &model->w1[0][0], 784,
+        0.0f,
+        bm->z1_batch, HIDDEN
+    );
 
-#define min(a, b) a < b ? a : b
-#define max(a, b) a > b ? a : b
+    // Add bias + ReLU
+    for (int i = 0; i < curr_batch_size; ++i)
+        for (int j = 0; j < HIDDEN; ++j)
+            bm->h_batch[i * HIDDEN + j] = relu(bm->z1_batch[i * HIDDEN + j] + model->b1[j]);
 
-Button b = {0, 0, 200, 50};
+    // Hidden -> output
+    cblas_sgemm(
+        CblasRowMajor, CblasNoTrans, CblasTrans,
+        curr_batch_size,  // <-- use curr_batch_size
+        10, HIDDEN, 1.0f,
+        bm->h_batch, HIDDEN,
+        &model->w2[0][0], HIDDEN,
+        0.0f,
+        bm->z2_batch, 10
+    );
 
-#define BUFFER_WIDTH 28
-#define BUFFER_HEIGHT 28
-#define BUFFER_SIZE BUFFER_WIDTH*BUFFER_HEIGHT
-uint8_t state[BUFFER_SIZE] = {0};
-
-#define OFFSET_LEN 9
-int offset_int8[OFFSET_LEN] = {150, 200, 150, 200, 255, 200, 150, 200, 150};
-int offset[OFFSET_LEN] = 
-{
-    -BUFFER_WIDTH-1,
-    -BUFFER_WIDTH,
-    -BUFFER_WIDTH+1,
-    -1,
-    0,
-    1,
-    BUFFER_WIDTH-1,
-    BUFFER_WIDTH,
-    BUFFER_WIDTH+1,
-};
-
-int button_hit(int mx, int my)
-{
-    return (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h);
+    // Softmax row-wise
+    for (int i = 0; i < curr_batch_size; ++i)
+        softmax(&bm->z2_batch[i * 10], &bm->o_batch[i * 10]);
 }
 
-void render_button(SDL_Renderer* r)
+void batch_backprop(Model* model, BatchModel* bm, float* x_batch, int* label_batch, const float lr, const int curr_batch_size)
 {
-    SDL_SetRenderDrawColor(r, 0, 0, 255, 255);
-    SDL_RenderFillRect(r, &(SDL_Rect){ b.x, b.y, b.w, b.h });
-}
+    float delta_out_batch[BATCH_SIZE * 10];
+    float delta_hidden_batch[BATCH_SIZE * HIDDEN];
 
-void render_clear(SDL_Renderer* r)
-{
-    SDL_SetRenderDrawColor(r, 0,0,0,255);
-    SDL_RenderClear(r);
-    render_button(r);
-}
+    // Output layer error
+    memcpy(delta_out_batch, bm->o_batch, sizeof(float) * curr_batch_size * 10);
+    for (int i = 0; i < curr_batch_size; ++i)
+        delta_out_batch[i * 10 + label_batch[i]] -= 1.0f;
 
-void button_clicked()
-{
-    for (int i = 0; i < BUFFER_SIZE; ++i)
-        state[i] = 0;
-}
+    // delta_hidden
+    cblas_sgemm(
+        CblasRowMajor, CblasNoTrans, CblasNoTrans,
+        curr_batch_size,
+        HIDDEN, 10, 1.0f, delta_out_batch, 
+        10, &model->w2[0][0], 
+        HIDDEN, 0.0f, delta_hidden_batch, 
+        HIDDEN
+    );   
+    for (int i = 0; i < curr_batch_size; ++i)
+        for (int j = 0; j < HIDDEN; ++j)
+            delta_hidden_batch[i*HIDDEN + j] *= relu_derivative(bm->z1_batch[i*HIDDEN + j]);
 
-void dump_buffer()
-{
-    for (int i = 0; i < BUFFER_SIZE; ++i)
+    cblas_sgemm(
+        CblasRowMajor, CblasTrans, CblasNoTrans,
+        10, HIDDEN, curr_batch_size,
+        -lr,
+        delta_out_batch, 10,
+        bm->h_batch, HIDDEN, 1.0f,
+        &model->w2[0][0], HIDDEN
+    );
+
+    for (int j = 0; j < 10; ++j) 
     {
-        printf("%d", state[i] == 0 ? 0 : 1);
-        if ((i+1) % 28 == 0)
-            printf("\n");
+        float sum = 0.0f;
+        for (int i = 0; i < curr_batch_size; ++i)
+            sum += delta_out_batch[i*10 + j];
+        model->b2[j] -= lr * sum;
+    }
+
+    // update w1 and b1
+    cblas_sgemm(
+        CblasRowMajor, CblasTrans, CblasNoTrans,
+        HIDDEN, 784, curr_batch_size,
+        -lr,
+        delta_hidden_batch, HIDDEN,
+        x_batch, 784, 1.0f,
+        &model->w1[0][0], 784
+    );   
+
+    for (int j = 0; j < HIDDEN; ++j) 
+    {
+        float sum = 0.0f;
+        for (int i = 0; i < curr_batch_size; ++i)
+            sum += delta_hidden_batch[i*HIDDEN + j];
+        model->b1[j] -= lr * sum;
     }
 }
 
-void handle_drag(int mx, int my)
-{ 
-    if (mx < 0 || mx >= WINDOW_WIDTH || my < 0 || my >= WINDOW_HEIGHT)
-        return;
+void forwardprop(Model* model, float* X) 
+{
+    // s (float) 
+    // ge (general) 
+    // mv (matrix-vector)
+    cblas_sgemv(
+        CblasRowMajor, CblasNoTrans, 
+        HIDDEN, 784, 1.0f, &model->w1[0][0],    // w1 in1
+        784, X, 1, 0.0f,                        // X  in2 single 784 vector
+        model->z1, 1                            // z1 out
+    );
 
-    if (button_hit(mx, my))
-        return;
+    for (int i = 0; i < HIDDEN; ++i)
+        model->h[i] = relu(model->z1[i] + model->b1[i]);
 
-    float buffer_x = ((float)mx / WINDOW_WIDTH) * 28.0f;
-    float buffer_y = ((float)my / WINDOW_HEIGHT) * 28.0f;
+    // z2 = W2 * h
+    cblas_sgemv(
+        CblasRowMajor, CblasNoTrans,
+        10, HIDDEN, 1.0f, &model->w2[0][0], 
+        HIDDEN, model->h, 1, 0.0f,
+        model->z2, 1
+    );
 
-    printf("buffer_x %f, buffer_y %f\n", buffer_x, buffer_y);
-
-    int idx = (int)buffer_y * BUFFER_WIDTH + (int)buffer_x;
-    if (idx < 0 || idx >= BUFFER_SIZE)
-        return;
-
-    for (int i = 0; i < OFFSET_LEN; ++i)
-    {
-        int curr = idx + offset[i];
-        if (curr < 0 || curr >= BUFFER_SIZE)
-            continue;
-        state[curr] = min(state[curr] + offset_int8[i], 255);
-    }
+    softmax(model->z2, model->o);
 }
 
-void render_state(SDL_Renderer* r)
+void backprop(Model* model, float* X, int label, float lr)
 {
-    for (int i = 0; i < BUFFER_SIZE; ++i)
-    {
-        int x = i % BUFFER_WIDTH;
-        int y = i / BUFFER_WIDTH;
-        float rx = (float)x / 28.0f;
-        float ry = (float)y / 28.0f;
+    float delta_out[10];
+    float delta_hidden[HIDDEN] = {0};
 
-        if (state[i])
+    // Output layer error
+    memcpy(delta_out, model->o, sizeof(float) * 10);
+    delta_out[label] -= 1;
+
+    // delta_hidden
+    cblas_sgemv(
+        CblasRowMajor, CblasTrans,
+        10, HIDDEN, 1.0f, &model->w2[0][0],
+        HIDDEN, delta_out, 1, 0.0f,
+        delta_hidden, 1
+    );
+    for (int i = 0; i < HIDDEN; ++i)
+        delta_hidden[i] *= relu_derivative(model->z1[i]);
+
+    // update w2 and b2
+    cblas_sger(
+        CblasRowMajor,
+        10, HIDDEN, -lr, 
+        delta_out, 1,        
+        model->h, 1,        
+        &model->w2[0][0],  
+        HIDDEN            
+    );
+    for (int i = 0; i < 10; ++i) 
+        model->b2[i] -= lr * delta_out[i]; 
+
+    // update w1 and b1
+    cblas_sger(
+        CblasRowMajor, 
+        HIDDEN, 784, -lr, 
+        delta_hidden, 1,
+        X, 1, 
+        &model->w1[0][0],
+        784
+    );
+    for (int i = 0; i < HIDDEN; ++i)
+        model->b1[i] -= lr * delta_hidden[i];
+}
+
+void check_accuracy(Model* model, float* images, const int image_count, const int* labels)
+{
+    int correct = 0;
+        for (int i = 0; i < image_count; ++i)
         {
-            SDL_SetRenderDrawColor(r, state[i], state[i], state[i], 255);
-            SDL_RenderFillRect(r, &(SDL_Rect){rx * WINDOW_WIDTH, ry * WINDOW_HEIGHT, WINDOW_WIDTH / 28, WINDOW_HEIGHT / 28});
+            float* X = &images[i * 784];
+            forwardprop(model, X);
+            int predicted = argmax_index(model->o, 10);
+            if (predicted == labels[i])
+                correct++;
         }
-    }
+        float accuracy = (float)correct / image_count;
+        printf("Accuracy %.2f%%\n", accuracy * 100);
 }
 
-int main()
+int main(void)
 {
+    srand(time(0));
+
+    IDX_Data* image_idx = idx_load(TRAIN_FILE);
+    log_idx_data(image_idx);
+
+    IDX_Data* label_idx = idx_load(TRAIN_LABELS);
+    log_idx_data(label_idx);   
+
+    const int label_count = label_idx->dims[0];
+    int* labels = malloc(sizeof(int) * label_count);
+    for (int i = 0; i < label_count; ++i)
+        labels[i] = *get_label(label_idx, i);
+
+    const int image_count = image_idx->dims[0];
+    const int image_size = image_idx->total_bytes / image_count;
+    float* images = get_float_images(image_idx);
+
+    float* X = NULL;
+
+    Model model; 
+
+    /* training model
+    seed_model(&model);
+
+    BatchModel bm = {0};
+
+    const float lr = 1e-3;
+    const int num_epoch = 50;
+    for (int epoch = 0; epoch < num_epoch; ++epoch)
+    { 
+        printf("epoch left: %d\n", num_epoch - epoch);
+        
+        //  yes batching :)
+        for (int start = 0; start < image_count; start += BATCH_SIZE)
+        {
+            // if image_count not divisible by BATCH_SIZE
+            int curr_batch_size = min(BATCH_SIZE, image_count - start); 
+
+            float* x_batch = &images[start * 784];
+            int* label_batch = &labels[start];
+
+            batch_forwardprop(&model, &bm, x_batch, curr_batch_size);
+            batch_backprop(&model, &bm, x_batch, label_batch, lr, curr_batch_size);
+        }
+        */
+        /*
+
+         no batching
+        for (int i = 0; i < image_count; ++i)
+        {
+            X = &images[i * image_size];
+
+            forwardprop(&model, X);
+            backprop(&model, X, labels[i], lr);
+
+            // log_loss(one_hot, o);
+        }
+        
+        */
+    // }
+
+    load_model("out.dat", &model);
+    check_accuracy(&model, images, image_count, labels);
+
+    // save_model(NULL, &model);
+    
     SDL_Window* window;
     SDL_Renderer* renderer;
+
     init_sdl(&window, &renderer);
 
     int running = 1;
@@ -166,6 +317,15 @@ int main()
         {
             render_clear(renderer);
             render_state(renderer);
+
+            float image_f[784] = {0};
+            float_image_from_uint8(image_f, state);
+            // dump_float_image(image_f, image_size);
+
+            forwardprop(&model, image_f);
+            printf("number: %d\n", argmax_index(model.o, 10));
+            fflush(stdout);
+
             SDL_RenderPresent(renderer);
             must_update = 0;
         }
@@ -174,6 +334,12 @@ int main()
     }
 
     cleanup_sdl(window, renderer);
+
+    free(images);
+    free(labels);
+
+    idx_free(image_idx);
+    idx_free(label_idx);
 
     return 0;
 }
