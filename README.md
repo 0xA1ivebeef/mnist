@@ -9,3 +9,5 @@ implements:
 TODO: 
     - user interface with realtime drawing-eval
 
+## Preview
+![App Screenshot](screenshots/example.png)
