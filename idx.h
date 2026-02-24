@@ -6,6 +6,14 @@
 #include <stdio.h>
 #include <stdint.h>
 
+typedef struct Dataset
+{
+    float* images;
+    int* labels;
+    int image_count;
+    int image_size;
+} Dataset;
+
 typedef struct 
 {
     uint8_t data_type;     // e.g. 0x08 = uint8_t
